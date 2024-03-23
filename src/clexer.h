@@ -63,6 +63,10 @@ int nisdigit(char c)
   return !isdigit(c);
 }
 
+int nisvalid_ident(char c) {
+  return !(c == '_' || isalnum(c));
+}
+
 // Code from:
 //   chux - Reinstate Monica
 //   https://stackoverflow.com/questions/174531/how-to-read-the-content-of-a-file-to-a-string-in-c
@@ -92,18 +96,19 @@ char *file_to_str(char *filepath) {
 }
 
 typedef enum TokenType {
-  TOKENTYPE_LPAREN,
+  TOKENTYPE_LPAREN = 0,
   TOKENTYPE_RPAREN,
   TOKENTYPE_LBRACKET,
   TOKENTYPE_RBRACKET,
   TOKENTYPE_LBRACE,
   TOKENTYPE_RBRACE,
-  TOKENTYPE_SYM_LEN,
+  TOKENTYPE_SYM_LEN, // DO NOT USE! Used for the length of symbols.
 
   TOKENTYPE_EOF,
   TOKENTYPE_INTLIT,
   TOKENTYPE_STRLIT,
   TOKENTYPE_IDENT,
+  TOKENTYPE_KEYWORD,
 } TokenType;
 
 typedef struct Token {
@@ -125,6 +130,21 @@ typedef struct Lexer {
 char *tokentype_to_str(TokenType type)
 {
   switch (type) {
+  case TOKENTYPE_LPAREN:
+    return "LPAREN";
+  case TOKENTYPE_RPAREN:
+    return "RPAREN";
+  case TOKENTYPE_LBRACKET:
+    return "LBRACKET";
+  case TOKENTYPE_RBRACKET:
+    return "RBRACKET";
+  case TOKENTYPE_LBRACE:
+    return "LBRACE";
+  case TOKENTYPE_RBRACE:
+    return "RBRACE";
+  case TOKENTYPE_SYM_LEN:
+    assert(0 && "should not use TOKENTYPE_SYM_LEN");
+    return NULL;
   case TOKENTYPE_EOF:
     return "EOF";
   case TOKENTYPE_INTLIT:
@@ -133,12 +153,11 @@ char *tokentype_to_str(TokenType type)
     return "STRLIT";
   case TOKENTYPE_IDENT:
     return "IDENT";
-  case TOKENTYPE_LPAREN:
-    return "LPAREN";
-  case TOKENTYPE_RPAREN:
-    return "RPAREN";
+  case TOKENTYPE_KEYWORD:
+    return "KEYWORD";
   default:
-    assert(0 && "unknown tokentype");
+    assert(0 && "unknown type");
+    return NULL;
   }
   return NULL;
 }
@@ -195,20 +214,26 @@ void lexer_dump(Lexer *lexer)
   }
 }
 
+int is_keyword(char *s, size_t len, char **keywords, size_t keywords_len)
+{
+  for (size_t i = 0; i < keywords_len; ++i) {
+    if (strncmp(s, keywords[i], len) == 0) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
 #define SYMTIDX(c)                              \
-  ((c == '(') ? 4 :                             \
-   (c == ')') ? 5 :                             \
-   (c == '[') ? 6 :                             \
-   (c == ']') ? 7 :                             \
-   (c == '{') ? 8 :                             \
-   (c == '}') ? 9 : -1)
+  ((c == '(') ? 0 :                             \
+   (c == ')') ? 1 :                             \
+   (c == '[') ? 2 :                             \
+   (c == ']') ? 3 :                             \
+   (c == '{') ? 4 :                             \
+   (c == '}') ? 5 : -1)
 
 Lexer lex_file(char *filepath, char **keywords)
 {
-  (void)keywords;
-
-  printf("%d\n", TOKENTYPE_SYM_LEN);
-
   int symtbl[TOKENTYPE_SYM_LEN] = {
     TOKENTYPE_LPAREN,
     TOKENTYPE_RPAREN,
@@ -251,36 +276,6 @@ Lexer lex_file(char *filepath, char **keywords)
       lexer_append(&lexer, tok);
       ++col;
     } break;
-    /* case '(': { */
-    /*   tok = token_alloc(&lexer, src+i, 1, TOKENTYPE_LPAREN, row, col, filepath); */
-    /*   lexer_append(&lexer, tok); */
-    /*   ++col; */
-    /* } break; */
-    /* case ')': { */
-    /*   tok = token_alloc(&lexer, src+i, 1, TOKENTYPE_RPAREN, row, col, filepath); */
-    /*   lexer_append(&lexer, tok); */
-    /*   ++col; */
-    /* } break; */
-    /* case '[': { */
-    /*   tok = token_alloc(&lexer, src+i, 1, TOKENTYPE_LBRACKET, row, col, filepath); */
-    /*   lexer_append(&lexer, tok); */
-    /*   ++col; */
-    /* } break; */
-    /* case ']': { */
-    /*   tok = token_alloc(&lexer, src+i, 1, TOKENTYPE_RBRACKET, row, col, filepath); */
-    /*   lexer_append(&lexer, tok); */
-    /*   ++col; */
-    /* } break; */
-    /* case '{': { */
-    /*   tok = token_alloc(&lexer, src+i, 1, TOKENTYPE_LBRACE, row, col, filepath); */
-    /*   lexer_append(&lexer, tok); */
-    /*   ++col; */
-    /* } break; */
-    /* case '}': { */
-    /*   tok = token_alloc(&lexer, src+i, 1, TOKENTYPE_RBRACE, row, col, filepath); */
-    /*   lexer_append(&lexer, tok); */
-    /*   ++col; */
-    /* } break; */
     case '"': {
       size_t strlit_len = consume_until(src+i+1, is_quote);
       tok = token_alloc(&lexer, src+i+1, strlit_len, TOKENTYPE_STRLIT, row, col, filepath);
@@ -307,9 +302,14 @@ Lexer lex_file(char *filepath, char **keywords)
       i += intlit_len-1;
       col += intlit_len;
     } break;
-    default:
-      assert(0 && "unimplemented");
-      break;
+    default: { // Idents, keywords
+      size_t ident_len = consume_until(src+i, nisvalid_ident);
+      TokenType type = is_keyword(src+i, ident_len, keywords, 1) ? TOKENTYPE_KEYWORD : TOKENTYPE_IDENT;
+      tok = token_alloc(&lexer, src+i, ident_len, type, row, col, filepath);
+      lexer_append(&lexer, tok);
+      i += ident_len-1;
+      col += ident_len;
+    } break;
     }
   }
 
