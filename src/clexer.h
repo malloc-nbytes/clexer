@@ -92,12 +92,18 @@ char *file_to_str(char *filepath) {
 }
 
 typedef enum TokenType {
+  TOKENTYPE_LPAREN,
+  TOKENTYPE_RPAREN,
+  TOKENTYPE_LBRACKET,
+  TOKENTYPE_RBRACKET,
+  TOKENTYPE_LBRACE,
+  TOKENTYPE_RBRACE,
+  TOKENTYPE_SYM_LEN,
+
   TOKENTYPE_EOF,
   TOKENTYPE_INTLIT,
   TOKENTYPE_STRLIT,
   TOKENTYPE_IDENT,
-  TOKENTYPE_LPAREN,
-  TOKENTYPE_RPAREN,
 } TokenType;
 
 typedef struct Token {
@@ -189,9 +195,28 @@ void lexer_dump(Lexer *lexer)
   }
 }
 
+#define SYMTIDX(c)                              \
+  ((c == '(') ? 4 :                             \
+   (c == ')') ? 5 :                             \
+   (c == '[') ? 6 :                             \
+   (c == ']') ? 7 :                             \
+   (c == '{') ? 8 :                             \
+   (c == '}') ? 9 : -1)
+
 Lexer lex_file(char *filepath, char **keywords)
 {
   (void)keywords;
+
+  printf("%d\n", TOKENTYPE_SYM_LEN);
+
+  int symtbl[TOKENTYPE_SYM_LEN] = {
+    TOKENTYPE_LPAREN,
+    TOKENTYPE_RPAREN,
+    TOKENTYPE_LBRACKET,
+    TOKENTYPE_RBRACKET,
+    TOKENTYPE_LBRACE,
+    TOKENTYPE_RBRACE,
+  };
 
   char *src = file_to_str(filepath);
   Lexer lexer = (Lexer) {
@@ -216,16 +241,46 @@ Lexer lex_file(char *filepath, char **keywords)
     case ' ':
       ++col;
       break;
-    case '(': {
-      tok = token_alloc(&lexer, src+i, 1, TOKENTYPE_LPAREN, row, col, filepath);
+    case '(':
+    case ')':
+    case '[':
+    case ']':
+    case '{':
+    case '}': {
+      tok = token_alloc(&lexer, src+i, 1, symtbl[SYMTIDX(c)], row, col, filepath);
       lexer_append(&lexer, tok);
       ++col;
     } break;
-    case ')': {
-      tok = token_alloc(&lexer, src+i, 1, TOKENTYPE_RPAREN, row, col, filepath);
-      lexer_append(&lexer, tok);
-      ++col;
-    } break;
+    /* case '(': { */
+    /*   tok = token_alloc(&lexer, src+i, 1, TOKENTYPE_LPAREN, row, col, filepath); */
+    /*   lexer_append(&lexer, tok); */
+    /*   ++col; */
+    /* } break; */
+    /* case ')': { */
+    /*   tok = token_alloc(&lexer, src+i, 1, TOKENTYPE_RPAREN, row, col, filepath); */
+    /*   lexer_append(&lexer, tok); */
+    /*   ++col; */
+    /* } break; */
+    /* case '[': { */
+    /*   tok = token_alloc(&lexer, src+i, 1, TOKENTYPE_LBRACKET, row, col, filepath); */
+    /*   lexer_append(&lexer, tok); */
+    /*   ++col; */
+    /* } break; */
+    /* case ']': { */
+    /*   tok = token_alloc(&lexer, src+i, 1, TOKENTYPE_RBRACKET, row, col, filepath); */
+    /*   lexer_append(&lexer, tok); */
+    /*   ++col; */
+    /* } break; */
+    /* case '{': { */
+    /*   tok = token_alloc(&lexer, src+i, 1, TOKENTYPE_LBRACE, row, col, filepath); */
+    /*   lexer_append(&lexer, tok); */
+    /*   ++col; */
+    /* } break; */
+    /* case '}': { */
+    /*   tok = token_alloc(&lexer, src+i, 1, TOKENTYPE_RBRACE, row, col, filepath); */
+    /*   lexer_append(&lexer, tok); */
+    /*   ++col; */
+    /* } break; */
     case '"': {
       size_t strlit_len = consume_until(src+i+1, is_quote);
       tok = token_alloc(&lexer, src+i+1, strlit_len, TOKENTYPE_STRLIT, row, col, filepath);
