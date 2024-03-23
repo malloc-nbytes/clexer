@@ -102,6 +102,15 @@ typedef enum TokenType {
   TOKENTYPE_RBRACKET,
   TOKENTYPE_LBRACE,
   TOKENTYPE_RBRACE,
+  TOKENTYPE_HASH,
+  TOKENTYPE_PERIOD,
+  TOKENTYPE_SEMICOLON,
+  TOKENTYPE_COMMA,
+  TOKENTYPE_GREATERTHAN,
+  TOKENTYPE_LESSTHAN,
+  TOKENTYPE_EQUALS,
+  TOKENTYPE_AMPERSAND,
+  TOKENTYPE_ASTERISK,
   TOKENTYPE_SYM_LEN, // DO NOT USE! Used for the length of symbols.
 
   TOKENTYPE_EOF,
@@ -142,6 +151,24 @@ char *tokentype_to_str(TokenType type)
     return "LBRACE";
   case TOKENTYPE_RBRACE:
     return "RBRACE";
+  case TOKENTYPE_HASH:
+    return "HASH";
+  case TOKENTYPE_PERIOD:
+    return "PERIOD";
+  case TOKENTYPE_COMMA:
+    return "COMMA";
+  case TOKENTYPE_SEMICOLON:
+    return "SEMICOLON";
+  case TOKENTYPE_GREATERTHAN:
+    return "GREATERTHAN";
+  case TOKENTYPE_LESSTHAN:
+    return "LESSTHAN";
+  case TOKENTYPE_EQUALS:
+    return "EQUALS";
+  case TOKENTYPE_AMPERSAND:
+    return "AMPERSAND";
+  case TOKENTYPE_ASTERISK:
+    return "ASTERISK";
   case TOKENTYPE_SYM_LEN:
     assert(0 && "should not use TOKENTYPE_SYM_LEN");
     return NULL;
@@ -209,7 +236,7 @@ void lexer_dump(Lexer *lexer)
 {
   Token *tok;
   while ((tok = lexer_next(lexer))) {
-    printf("lexeme: %s, type: %s, row: %zu, col: %zu, fp: %s\n",
+    printf("lexeme: \"%s\", type: %s, row: %zu, col: %zu, fp: %s\n",
            tok->lexeme, tokentype_to_str(tok->type), tok->row, tok->col, tok->fp);
   }
 }
@@ -230,7 +257,16 @@ int is_keyword(char *s, size_t len, char **keywords, size_t keywords_len)
    (c == '[') ? 2 :                             \
    (c == ']') ? 3 :                             \
    (c == '{') ? 4 :                             \
-   (c == '}') ? 5 : -1)
+   (c == '}') ? 5 :                             \
+   (c == '#') ? 6 :                             \
+   (c == '.') ? 7 :                             \
+   (c == ';') ? 8 :                             \
+   (c == ',') ? 9 :                             \
+   (c == '>') ? 10 :                            \
+   (c == '<') ? 11 :                            \
+   (c == '=') ? 12 :                            \
+   (c == '&') ? 13 :                            \
+   (c == '*') ? 14 : -1)
 
 Lexer lex_file(char *filepath, char **keywords)
 {
@@ -241,6 +277,15 @@ Lexer lex_file(char *filepath, char **keywords)
     TOKENTYPE_RBRACKET,
     TOKENTYPE_LBRACE,
     TOKENTYPE_RBRACE,
+    TOKENTYPE_HASH,
+    TOKENTYPE_PERIOD,
+    TOKENTYPE_SEMICOLON,
+    TOKENTYPE_COMMA,
+    TOKENTYPE_GREATERTHAN,
+    TOKENTYPE_LESSTHAN,
+    TOKENTYPE_EQUALS,
+    TOKENTYPE_AMPERSAND,
+    TOKENTYPE_ASTERISK,
   };
 
   char *src = file_to_str(filepath);
@@ -255,6 +300,7 @@ Lexer lex_file(char *filepath, char **keywords)
   for (i = 0, row = 1, col = 1; src[i]; ++i) {
     char c = src[i];
     Token *tok = NULL;
+    char *lexeme = src+i;
 
     switch (c) {
     case '\r':
@@ -271,14 +317,23 @@ Lexer lex_file(char *filepath, char **keywords)
     case '[':
     case ']':
     case '{':
-    case '}': {
-      tok = token_alloc(&lexer, src+i, 1, symtbl[SYMTIDX(c)], row, col, filepath);
+    case '}':
+    case '#':
+    case '.':
+    case ',':
+    case ';':
+    case '>':
+    case '<':
+    case '=':
+    case '&':
+    case '*': {
+      tok = token_alloc(&lexer, lexeme, 1, symtbl[SYMTIDX(c)], row, col, filepath);
       lexer_append(&lexer, tok);
       ++col;
     } break;
     case '"': {
-      size_t strlit_len = consume_until(src+i+1, is_quote);
-      tok = token_alloc(&lexer, src+i+1, strlit_len, TOKENTYPE_STRLIT, row, col, filepath);
+      size_t strlit_len = consume_until(lexeme+1, is_quote);
+      tok = token_alloc(&lexer, lexeme+1, strlit_len, TOKENTYPE_STRLIT, row, col, filepath);
       lexer_append(&lexer, tok);
       i += 1+strlit_len;
       col += 1+strlit_len+1;
@@ -296,16 +351,16 @@ Lexer lex_file(char *filepath, char **keywords)
     case '7':
     case '8':
     case '9': {
-      size_t intlit_len = consume_until(src+i, nisdigit);
-      tok = token_alloc(&lexer, src+i, intlit_len, TOKENTYPE_INTLIT, row, col, filepath);
+      size_t intlit_len = consume_until(lexeme, nisdigit);
+      tok = token_alloc(&lexer, lexeme, intlit_len, TOKENTYPE_INTLIT, row, col, filepath);
       lexer_append(&lexer, tok);
       i += intlit_len-1;
       col += intlit_len;
     } break;
     default: { // Idents, keywords
-      size_t ident_len = consume_until(src+i, nisvalid_ident);
-      TokenType type = is_keyword(src+i, ident_len, keywords, 1) ? TOKENTYPE_KEYWORD : TOKENTYPE_IDENT;
-      tok = token_alloc(&lexer, src+i, ident_len, type, row, col, filepath);
+      size_t ident_len = consume_until(lexeme, nisvalid_ident);
+      TokenType type = is_keyword(lexeme, ident_len, keywords, 1) ? TOKENTYPE_KEYWORD : TOKENTYPE_IDENT;
+      tok = token_alloc(&lexer, lexeme, ident_len, type, row, col, filepath);
       lexer_append(&lexer, tok);
       i += ident_len-1;
       col += ident_len;
