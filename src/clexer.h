@@ -18,7 +18,8 @@ typedef struct Arena {
   size_t cap;
 } Arena;
 
-uint8_t *arena_alloc(Arena *arena, size_t bytes)
+uint8_t *
+arena_alloc(Arena *arena, size_t bytes)
 {
   if (arena->len+bytes > arena->cap) {
     arena->cap *= 2;
@@ -29,13 +30,15 @@ uint8_t *arena_alloc(Arena *arena, size_t bytes)
   return mem;
 }
 
-void arena_free(Arena *arena)
+void
+arena_free(Arena *arena)
 {
   free(arena->mem);
   free(arena);
 }
 
-Arena *arena_create(size_t cap)
+Arena *
+arena_create(size_t cap)
 {
   Arena *arena = malloc(sizeof(Arena));
   arena->mem = malloc(cap);
@@ -46,7 +49,8 @@ Arena *arena_create(size_t cap)
 
 // ********** HELPERS ********** //
 
-size_t consume_until(char *s, int (*predicate)(char))
+size_t
+consume_until(char *s, int (*predicate)(char))
 {
   size_t i;
   int skip = 0;
@@ -64,7 +68,8 @@ size_t consume_until(char *s, int (*predicate)(char))
   return i;
 }
 
-size_t find_comment_end(char *s)
+size_t
+find_comment_end(char *s)
 {
   size_t i;
   for (i = 0; s[i]; ++i) {
@@ -75,7 +80,8 @@ size_t find_comment_end(char *s)
   return i;
 }
 
-char *find_multiline_comment_end(char *s, char *comment_end, size_t *row, size_t *col)
+char *
+find_multiline_comment_end(char *s, char *comment_end, size_t *row, size_t *col)
 {
   size_t comment_end_len = strlen(comment_end);
   for (size_t i = 0; s[i]; ++i) {
@@ -93,29 +99,34 @@ char *find_multiline_comment_end(char *s, char *comment_end, size_t *row, size_t
   return s;
 }
 
-int is_newline(char c)
+int
+is_newline(char c)
 {
   return c == '\n';
 }
 
-int is_quote(char c)
+int
+is_quote(char c)
 {
   return c == '"';
 }
 
-int nisdigit(char c)
+int
+nisdigit(char c)
 {
   return !isdigit(c);
 }
 
-int nisvalid_ident(char c) {
+int
+nisvalid_ident(char c) {
   return !(c == '_' || isalnum(c));
 }
 
 // Code from:
 //   chux - Reinstate Monica
 //   https://stackoverflow.com/questions/174531/how-to-read-the-content-of-a-file-to-a-string-in-c
-char *file_to_str(char *filepath) {
+char *
+file_to_str(char *filepath) {
   FILE *f = fopen(filepath, "rb");
 
   if (f == NULL || fseek(f, 0, SEEK_END)) {
@@ -194,7 +205,8 @@ typedef struct Lexer {
   Arena *arena;
 } Lexer;
 
-char *tokentype_to_str(TokenType type)
+char *
+tokentype_to_str(TokenType type)
 {
   switch (type) {
   case TOKENTYPE_LPAREN:
@@ -273,7 +285,8 @@ char *tokentype_to_str(TokenType type)
   return NULL;
 }
 
-Token *token_alloc(Lexer *lexer,
+Token *
+token_alloc(Lexer *lexer,
                    char *start, size_t len,
                    TokenType type,
                    size_t row, size_t col, char *fp)
@@ -294,7 +307,8 @@ Token *token_alloc(Lexer *lexer,
   return tok;
 }
 
-void lexer_append(Lexer *lexer, Token *tok)
+void
+lexer_append(Lexer *lexer, Token *tok)
 {
   if (!lexer->hd) {
     lexer->hd = tok;
@@ -306,7 +320,8 @@ void lexer_append(Lexer *lexer, Token *tok)
   ++lexer->len;
 }
 
-Token *lexer_next(Lexer *lexer)
+Token *
+lexer_next(Lexer *lexer)
 {
   Token *tok = lexer->hd;
   if (tok) {
@@ -316,7 +331,8 @@ Token *lexer_next(Lexer *lexer)
   return tok;
 }
 
-void lexer_dump(Lexer *lexer)
+void
+lexer_dump(Lexer *lexer)
 {
   Token *tok;
   while ((tok = lexer_next(lexer))) {
@@ -325,7 +341,8 @@ void lexer_dump(Lexer *lexer)
   }
 }
 
-int is_keyword(char *s, size_t len, char **keywords, size_t keywords_len)
+int
+is_keyword(char *s, size_t len, char **keywords, size_t keywords_len)
 {
   for (size_t i = 0; i < keywords_len; ++i) {
     if (strncmp(s, keywords[i], len) == 0) {
@@ -335,7 +352,8 @@ int is_keyword(char *s, size_t len, char **keywords, size_t keywords_len)
   return 0;
 }
 
-int try_comment(char *src, char *comment)
+int
+try_comment(char *src, char *comment)
 {
   if (strncmp(src, comment, strlen(comment)) == 0) {
     /* return consume_until(src, is_newline); */
@@ -345,7 +363,8 @@ int try_comment(char *src, char *comment)
   return 0;
 }
 
-char *try_multiline_comment(char *src, char *comment_start, char *comment_end, size_t *row, size_t *col)
+char *
+try_multiline_comment(char *src, char *comment_start, char *comment_end, size_t *row, size_t *col)
 {
   if (strncmp(src, comment_start, strlen(comment_start)) == 0) {
     return find_multiline_comment_end(src, comment_end, row, col);
@@ -384,7 +403,39 @@ char *try_multiline_comment(char *src, char *comment_start, char *comment_end, s
    (c == '`') ? 26 :                            \
    (c == '~') ? 27 : -1)
 
-Lexer lex_file(char *filepath, char **keywords, char **comments)
+void
+assert_symtbl_inorder(int *symtbl)
+{
+  for (size_t i = 0; i < TOKENTYPE_SYM_LEN-1; ++i) {
+    if (symtbl[i] != symtbl[i+1]-1) {
+      fprintf(stderr, "ERR: symtbl out of order. left = %s, right = %s\n",
+              tokentype_to_str(symtbl[i]), tokentype_to_str(symtbl[i+1]));
+      exit(EXIT_FAILURE);
+    }
+  }
+}
+
+void
+assert_symtidx_inorder(void)
+{
+  char order[] = {
+    '(', ')', '[', ']', '{',
+    '}', '#', '.', ';', ',',
+    '>', '<', '=', '&', '*',
+    '+', '-', '/', '|', '^',
+    '?', '\\', '!', '@', '$',
+    '%', '`', '~',
+  };
+
+  assert(TOKENTYPE_SYM_LEN == sizeof(order)/sizeof(*order));
+
+  for (size_t i = 0; i < TOKENTYPE_SYM_LEN; ++i) {
+    assert(SYMTIDX(order[i]) == (int)i);
+  }
+}
+
+Lexer
+lex_file(char *filepath, char **keywords, char **comments)
 {
   int symtbl[TOKENTYPE_SYM_LEN] = {
     TOKENTYPE_LPAREN,
@@ -416,6 +467,9 @@ Lexer lex_file(char *filepath, char **keywords, char **comments)
     TOKENTYPE_BACKTICK,
     TOKENTYPE_TILDE,
   };
+
+  assert_symtbl_inorder(symtbl);
+  assert_symtidx_inorder();
 
   char *src = file_to_str(filepath);
   Lexer lexer = (Lexer) {
@@ -545,7 +599,8 @@ Lexer lex_file(char *filepath, char **keywords, char **comments)
   return lexer;
 }
 
-void lexer_free(Lexer *lexer)
+void
+lexer_free(Lexer *lexer)
 {
   arena_free(lexer->arena);
   lexer->len = 0;
