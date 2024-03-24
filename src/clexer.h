@@ -111,6 +111,19 @@ typedef enum TokenType {
   TOKENTYPE_EQUALS,
   TOKENTYPE_AMPERSAND,
   TOKENTYPE_ASTERISK,
+  TOKENTYPE_PLUS,
+  TOKENTYPE_MINUS,
+  TOKENTYPE_FORWARDSLASH,
+  TOKENTYPE_PIPE,
+  TOKENTYPE_CARET,
+  TOKENTYPE_QUESTIONMARK,
+  TOKENTYPE_BACKWARDSLASH,
+  TOKENTYPE_BANG,
+  TOKENTYPE_AT,
+  TOKENTYPE_DOLLARSIGN,
+  TOKENTYPE_PERCENT,
+  TOKENTYPE_BACKTICK,
+  TOKENTYPE_TILDE,
   TOKENTYPE_SYM_LEN, // DO NOT USE! Used for the length of symbols.
 
   TOKENTYPE_EOF,
@@ -169,6 +182,32 @@ char *tokentype_to_str(TokenType type)
     return "AMPERSAND";
   case TOKENTYPE_ASTERISK:
     return "ASTERISK";
+  case TOKENTYPE_PLUS:
+    return "PLUS";
+  case TOKENTYPE_MINUS:
+    return "MINUS";
+  case TOKENTYPE_FORWARDSLASH:
+    return "FORWARDSLASH";
+  case TOKENTYPE_PIPE:
+    return "PIPE";
+  case TOKENTYPE_CARET:
+    return "CARET";
+  case TOKENTYPE_QUESTIONMARK:
+    return "QUESTIONMARK";
+  case TOKENTYPE_BACKWARDSLASH:
+    return "BACKWARDSLASH";
+  case TOKENTYPE_BANG:
+    return "BANG";
+  case TOKENTYPE_AT:
+    return "AT";
+  case TOKENTYPE_DOLLARSIGN:
+    return "DOLLARSIGN";
+  case TOKENTYPE_PERCENT:
+    return "PERCENT";
+  case TOKENTYPE_BACKTICK:
+    return "BACKTICK";
+  case TOKENTYPE_TILDE:
+    return "TILDE";
   case TOKENTYPE_SYM_LEN:
     assert(0 && "should not use TOKENTYPE_SYM_LEN");
     return NULL;
@@ -266,7 +305,20 @@ int is_keyword(char *s, size_t len, char **keywords, size_t keywords_len)
    (c == '<') ? 11 :                            \
    (c == '=') ? 12 :                            \
    (c == '&') ? 13 :                            \
-   (c == '*') ? 14 : -1)
+   (c == '*') ? 14 :                            \
+   (c == '+') ? 15 :                            \
+   (c == '-') ? 16 :                            \
+   (c == '/') ? 17 :                            \
+   (c == '|') ? 18 :                            \
+   (c == '^') ? 19 :                            \
+   (c == '?') ? 20 :                            \
+   (c == '\\') ? 21 :                           \
+   (c == '!') ? 22 :                            \
+   (c == '@') ? 23 :                            \
+   (c == '$') ? 24 :                            \
+   (c == '%') ? 25 :                            \
+   (c == '`') ? 26 :                            \
+   (c == '~') ? 27 : -1)
 
 Lexer lex_file(char *filepath, char **keywords)
 {
@@ -286,6 +338,19 @@ Lexer lex_file(char *filepath, char **keywords)
     TOKENTYPE_EQUALS,
     TOKENTYPE_AMPERSAND,
     TOKENTYPE_ASTERISK,
+    TOKENTYPE_PLUS,
+    TOKENTYPE_MINUS,
+    TOKENTYPE_FORWARDSLASH,
+    TOKENTYPE_PIPE,
+    TOKENTYPE_CARET,
+    TOKENTYPE_QUESTIONMARK,
+    TOKENTYPE_BACKWARDSLASH,
+    TOKENTYPE_BANG,
+    TOKENTYPE_AT,
+    TOKENTYPE_DOLLARSIGN,
+    TOKENTYPE_PERCENT,
+    TOKENTYPE_BACKTICK,
+    TOKENTYPE_TILDE,
   };
 
   char *src = file_to_str(filepath);
@@ -326,7 +391,20 @@ Lexer lex_file(char *filepath, char **keywords)
     case '<':
     case '=':
     case '&':
-    case '*': {
+    case '*':
+    case '+':
+    case '-':
+    case '/':
+    case '|':
+    case '^':
+    case '?':
+    case '\\':
+    case '!':
+    case '@':
+    case '$':
+    case '%':
+    case '`':
+    case '~': {
       tok = token_alloc(&lexer, lexeme, 1, symtbl[SYMTIDX(c)], row, col, filepath);
       lexer_append(&lexer, tok);
       ++col;
