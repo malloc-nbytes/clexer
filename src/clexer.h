@@ -12,14 +12,14 @@
 
 // ********** ARENA ********** //
 
-typedef struct Arena {
+struct arena {
   uint8_t *mem;
   size_t len;
   size_t cap;
-} Arena;
+};
 
 uint8_t *
-arena_alloc(Arena *arena, size_t bytes)
+arena_alloc(struct arena *arena, size_t bytes)
 {
   if (arena->len+bytes > arena->cap) {
     arena->cap *= 2;
@@ -31,16 +31,16 @@ arena_alloc(Arena *arena, size_t bytes)
 }
 
 void
-arena_free(Arena *arena)
+arena_free(struct arena *arena)
 {
   free(arena->mem);
   free(arena);
 }
 
-Arena *
+struct arena *
 arena_create(size_t cap)
 {
-  Arena *arena = malloc(sizeof(Arena));
+  struct arena *arena = malloc(sizeof(struct arena));
   arena->mem = malloc(cap);
   arena->cap = cap;
   arena->len = 0;
@@ -151,7 +151,7 @@ file_to_str(char *filepath) {
   return buffer;
 }
 
-typedef enum TokenType {
+enum token_type {
   TOKENTYPE_LPAREN = 0,
   TOKENTYPE_RPAREN,
   TOKENTYPE_LBRACKET,
@@ -185,28 +185,29 @@ typedef enum TokenType {
   TOKENTYPE_EOF,
   TOKENTYPE_INTLIT,
   TOKENTYPE_STRLIT,
+  TOKENTYPE_CHARLIT,
   TOKENTYPE_IDENT,
   TOKENTYPE_KEYWORD,
-} TokenType;
+};
 
-typedef struct Token {
+struct token {
   char *lexeme; // alloc'd
-  TokenType type;
+  enum token_type type;
   size_t row;
   size_t col;
   char *fp;
-  struct Token *next;
-} Token;
+  struct token *next;
+};
 
-typedef struct Lexer {
-  Token *hd;
-  Token *tl;
+struct lexer {
+  struct token *hd;
+  struct token *tl;
   size_t len;
-  Arena *arena;
-} Lexer;
+  struct arena *arena;
+};
 
 char *
-tokentype_to_str(TokenType type)
+tokentype_to_str(enum token_type type)
 {
   switch (type) {
   case TOKENTYPE_LPAREN:
@@ -274,6 +275,8 @@ tokentype_to_str(TokenType type)
     return "INTLIT";
   case TOKENTYPE_STRLIT:
     return "STRLIT";
+  case TOKENTYPE_CHARLIT:
+    return "CHARLIT";
   case TOKENTYPE_IDENT:
     return "IDENT";
   case TOKENTYPE_KEYWORD:
@@ -285,13 +288,13 @@ tokentype_to_str(TokenType type)
   return NULL;
 }
 
-Token *
-token_alloc(Lexer *lexer,
+struct token *
+token_alloc(struct lexer *lexer,
                    char *start, size_t len,
-                   TokenType type,
+                   enum token_type type,
                    size_t row, size_t col, char *fp)
 {
-  Token *tok = (Token *)arena_alloc(lexer->arena, sizeof(Token));
+  struct token *tok = (struct token *)arena_alloc(lexer->arena, sizeof(struct token));
 
   char *lexeme = (char *)arena_alloc(lexer->arena, len+1);
   (void)strncpy(lexeme, start, len);
@@ -308,7 +311,7 @@ token_alloc(Lexer *lexer,
 }
 
 void
-lexer_append(Lexer *lexer, Token *tok)
+lexer_append(struct lexer *lexer, struct token *tok)
 {
   if (!lexer->hd) {
     lexer->hd = tok;
@@ -320,10 +323,10 @@ lexer_append(Lexer *lexer, Token *tok)
   ++lexer->len;
 }
 
-Token *
-lexer_next(Lexer *lexer)
+struct token *
+lexer_next(struct lexer *lexer)
 {
-  Token *tok = lexer->hd;
+  struct token *tok = lexer->hd;
   if (tok) {
     lexer->hd = tok->next;
     lexer->len--;
@@ -332,9 +335,9 @@ lexer_next(Lexer *lexer)
 }
 
 void
-lexer_dump(Lexer *lexer)
+lexer_dump(struct lexer *lexer)
 {
-  Token *tok;
+  struct token *tok;
   while ((tok = lexer_next(lexer))) {
     printf("lexeme: \"%s\", type: %s, row: %zu, col: %zu, fp: %s\n",
            tok->lexeme, tokentype_to_str(tok->type), tok->row, tok->col, tok->fp);
@@ -366,6 +369,8 @@ try_comment(char *src, char *comment)
 char *
 try_multiline_comment(char *src, char *comment_start, char *comment_end, size_t *row, size_t *col)
 {
+  assert(0 && "try_multiline_comment: unimplemented");
+
   if (strncmp(src, comment_start, strlen(comment_start)) == 0) {
     return find_multiline_comment_end(src, comment_end, row, col);
   }
@@ -434,7 +439,7 @@ assert_symtidx_inorder(void)
   }
 }
 
-Lexer
+struct lexer
 lex_file(char *filepath, char **keywords, char **comments)
 {
   int symtbl[TOKENTYPE_SYM_LEN] = {
@@ -472,7 +477,7 @@ lex_file(char *filepath, char **keywords, char **comments)
   assert_symtidx_inorder();
 
   char *src = file_to_str(filepath);
-  Lexer lexer = (Lexer) {
+  struct lexer lexer = (struct lexer) {
     .hd = NULL,
     .tl = NULL,
     .len = 0,
@@ -489,7 +494,7 @@ lex_file(char *filepath, char **keywords, char **comments)
   size_t i, row, col;
   for (i = 0, row = 1, col = 1; src[i]; ++i) {
     char c = src[i];
-    Token *tok = NULL;
+    struct token *tok = NULL;
     char *lexeme = src+i;
 
     // Single line comment
@@ -564,7 +569,11 @@ lex_file(char *filepath, char **keywords, char **comments)
       col += 1+strlit_len+1;
     } break;
     case '\'':
-      assert(0 && "unimplemented");
+      ++lexeme;
+      tok = token_alloc(&lexer, lexeme, 1, TOKENTYPE_CHARLIT, row, col, filepath);
+      lexer_append(&lexer, tok);
+      i += 2;
+      ++col;
       break;
     case '0':
     case '1':
@@ -584,7 +593,7 @@ lex_file(char *filepath, char **keywords, char **comments)
     } break;
     default: { // Idents, keywords
       size_t ident_len = consume_until(lexeme, nisvalid_ident);
-      TokenType type = is_keyword(lexeme, ident_len, keywords, 1) ? TOKENTYPE_KEYWORD : TOKENTYPE_IDENT;
+      enum token_type type = is_keyword(lexeme, ident_len, keywords, 1) ? TOKENTYPE_KEYWORD : TOKENTYPE_IDENT;
       tok = token_alloc(&lexer, lexeme, ident_len, type, row, col, filepath);
       lexer_append(&lexer, tok);
       i += ident_len-1;
@@ -600,7 +609,7 @@ lex_file(char *filepath, char **keywords, char **comments)
 }
 
 void
-lexer_free(Lexer *lexer)
+lexer_free(struct lexer *lexer)
 {
   arena_free(lexer->arena);
   lexer->len = 0;
