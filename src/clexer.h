@@ -49,8 +49,53 @@ Arena *arena_create(size_t cap)
 size_t consume_until(char *s, int (*predicate)(char))
 {
   size_t i;
-  for (i = 0; s[i] && !predicate(s[i]); ++i);
+  int skip = 0;
+  for (i = 0; s[i]; ++i) {
+    if (!skip && predicate(s[i])) {
+      return i;
+    }
+    if (s[i] == '\\') {
+      skip = 1;
+    }
+    else {
+      skip = 0;
+    }
+  }
   return i;
+}
+
+size_t find_comment_end(char *s)
+{
+  size_t i;
+  for (i = 0; s[i]; ++i) {
+    if (s[i] == '\n') {
+      return i;
+    }
+  }
+  return i;
+}
+
+char *find_multiline_comment_end(char *s, char *comment_end, size_t *row, size_t *col)
+{
+  size_t comment_end_len = strlen(comment_end);
+  for (size_t i = 0; s[i]; ++i) {
+    if (strncmp(s, comment_end, comment_end_len) == 0) {
+      return s+i;
+    }
+    if (s[i] == '\n') {
+      (*row)++;
+      *col = 1;
+    }
+    else {
+      (*col)++;
+    }
+  }
+  return s;
+}
+
+int is_newline(char c)
+{
+  return c == '\n';
 }
 
 int is_quote(char c)
@@ -290,6 +335,25 @@ int is_keyword(char *s, size_t len, char **keywords, size_t keywords_len)
   return 0;
 }
 
+int try_comment(char *src, char *comment)
+{
+  if (strncmp(src, comment, strlen(comment)) == 0) {
+    /* return consume_until(src, is_newline); */
+    return find_comment_end(src);
+  }
+
+  return 0;
+}
+
+char *try_multiline_comment(char *src, char *comment_start, char *comment_end, size_t *row, size_t *col)
+{
+  if (strncmp(src, comment_start, strlen(comment_start)) == 0) {
+    return find_multiline_comment_end(src, comment_end, row, col);
+  }
+
+  return 0;
+}
+
 #define SYMTIDX(c)                              \
   ((c == '(') ? 0 :                             \
    (c == ')') ? 1 :                             \
@@ -320,7 +384,7 @@ int is_keyword(char *s, size_t len, char **keywords, size_t keywords_len)
    (c == '`') ? 26 :                            \
    (c == '~') ? 27 : -1)
 
-Lexer lex_file(char *filepath, char **keywords)
+Lexer lex_file(char *filepath, char **keywords, char **comments)
 {
   int symtbl[TOKENTYPE_SYM_LEN] = {
     TOKENTYPE_LPAREN,
@@ -361,17 +425,46 @@ Lexer lex_file(char *filepath, char **keywords)
     .arena = arena_create(32768),
   };
 
+  char *comment = comments[0];
+  char *mcomment_start = comments[1];
+  char *mcomment_end = comments[2];
+
+  (void)mcomment_start;
+  (void)mcomment_end;
+
   size_t i, row, col;
   for (i = 0, row = 1, col = 1; src[i]; ++i) {
     char c = src[i];
     Token *tok = NULL;
     char *lexeme = src+i;
 
+    // Single line comment
+    if (comment && c == comment[0]) {
+      size_t comment_len;
+      if ((comment_len = try_comment(lexeme, comment)) >= strlen(comment)) {
+        i += comment_len;
+        col = 1;
+        ++row;
+        continue;
+      }
+      else {
+        // Reset
+        lexeme = src+i;
+      }
+    }
+    /* if (mcomment_start && c == mcomment_start[0]) { */
+    /*   char *comment_end = NULL; */
+    /*   if ((comment_end = try_multiline_comment(lexeme, mcomment_start, mcomment_end, &row, &col)) != NULL) { */
+    /*     src = comment_end; */
+    /*     continue; */
+    /*   } */
+    /* } */
+
     switch (c) {
     case '\r':
     case '\n':
       ++row;
-      col = 0;
+      col = 1;
       break;
     case '\t':
     case ' ':
