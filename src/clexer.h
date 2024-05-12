@@ -180,6 +180,7 @@ enum token_type {
   TOKENTYPE_PERCENT,
   TOKENTYPE_BACKTICK,
   TOKENTYPE_TILDE,
+  TOKENTYPE_COLON,
   TOKENTYPE_SYM_LEN, // DO NOT USE! Used for the length of symbols.
 
   TOKENTYPE_EOF,
@@ -266,6 +267,8 @@ tokentype_to_str(enum token_type type)
     return "BACKTICK";
   case TOKENTYPE_TILDE:
     return "TILDE";
+  case TOKENTYPE_COLON:
+    return "COLON";
   case TOKENTYPE_SYM_LEN:
     assert(0 && "should not use TOKENTYPE_SYM_LEN");
     return NULL;
@@ -406,7 +409,8 @@ try_multiline_comment(char *src, char *comment_start, char *comment_end, size_t 
    (c == '$') ? 24 :                            \
    (c == '%') ? 25 :                            \
    (c == '`') ? 26 :                            \
-   (c == '~') ? 27 : -1)
+   (c == '~') ? 27 :                            \
+   (c == ':') ? 28 : -1)
 
 void
 assert_symtbl_inorder(int *symtbl)
@@ -429,7 +433,7 @@ assert_symtidx_inorder(void)
     '>', '<', '=', '&', '*',
     '+', '-', '/', '|', '^',
     '?', '\\', '!', '@', '$',
-    '%', '`', '~',
+    '%', '`', '~', ':',
   };
 
   assert(TOKENTYPE_SYM_LEN == sizeof(order)/sizeof(*order));
@@ -471,6 +475,7 @@ lex_file(char *filepath, char **keywords, char **comments)
     TOKENTYPE_PERCENT,
     TOKENTYPE_BACKTICK,
     TOKENTYPE_TILDE,
+    TOKENTYPE_COLON,
   };
 
   assert_symtbl_inorder(symtbl);
@@ -556,7 +561,8 @@ lex_file(char *filepath, char **keywords, char **comments)
     case '$':
     case '%':
     case '`':
-    case '~': {
+    case '~':
+    case ':': {
       tok = token_alloc(&lexer, lexeme, 1, symtbl[SYMTIDX(c)], row, col, filepath);
       lexer_append(&lexer, tok);
       ++col;
