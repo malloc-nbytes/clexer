@@ -444,7 +444,7 @@ assert_symtidx_inorder(void)
 }
 
 struct lexer
-lex_file(char *filepath, char **keywords, char **comments)
+lex_file(char *filepath, char **keywords, size_t keywords_len, char *comment)
 {
   int symtbl[TOKENTYPE_SYM_LEN] = {
     TOKENTYPE_LPAREN,
@@ -489,13 +489,6 @@ lex_file(char *filepath, char **keywords, char **comments)
     .arena = arena_create(32768),
   };
 
-  char *comment = comments[0];
-  char *mcomment_start = comments[1];
-  char *mcomment_end = comments[2];
-
-  (void)mcomment_start;
-  (void)mcomment_end;
-
   size_t i, row, col;
   for (i = 0, row = 1, col = 1; src[i]; ++i) {
     char c = src[i];
@@ -503,7 +496,7 @@ lex_file(char *filepath, char **keywords, char **comments)
     char *lexeme = src+i;
 
     // Single line comment
-    if (comment && c == comment[0]) {
+    if (c == comment[0]) {
       size_t comment_len;
       if ((comment_len = try_comment(lexeme, comment)) >= strlen(comment)) {
         i += comment_len;
@@ -516,13 +509,6 @@ lex_file(char *filepath, char **keywords, char **comments)
         lexeme = src+i;
       }
     }
-    /* if (mcomment_start && c == mcomment_start[0]) { */
-    /*   char *comment_end = NULL; */
-    /*   if ((comment_end = try_multiline_comment(lexeme, mcomment_start, mcomment_end, &row, &col)) != NULL) { */
-    /*     src = comment_end; */
-    /*     continue; */
-    /*   } */
-    /* } */
 
     switch (c) {
     case '\r':
@@ -599,7 +585,7 @@ lex_file(char *filepath, char **keywords, char **comments)
     } break;
     default: { // Idents, keywords
       size_t ident_len = consume_until(lexeme, nisvalid_ident);
-      enum token_type type = is_keyword(lexeme, ident_len, keywords, 1) ? TOKENTYPE_KEYWORD : TOKENTYPE_IDENT;
+      enum token_type type = is_keyword(lexeme, ident_len, keywords, keywords_len) ? TOKENTYPE_KEYWORD : TOKENTYPE_IDENT;
       tok = token_alloc(&lexer, lexeme, ident_len, type, row, col, filepath);
       lexer_append(&lexer, tok);
       i += ident_len-1;
